@@ -53,6 +53,20 @@ class SimulacaoResponse(BaseModel):
     isento_ir: bool
 
 
+class ProdutoComparacao(BaseModel):
+    rotulo: str = Field(..., max_length=60, description="Nome exibido, ex: 'CDB 100% CDI'")
+    tipo: TipoInvestimento
+    indexador: Indexador
+    taxa: float = Field(..., gt=0)
+
+
+class ComparacaoRequest(BaseModel):
+    valor: float = Field(1000.0, gt=0)
+    meses_max: int = Field(24, ge=2, le=120)
+    produtos: list[ProdutoComparacao] = Field(..., min_length=1, max_length=5)
+    incluir_poupanca: bool = True
+
+
 class TaxasResponse(BaseModel):
     cdi_aa: float
     selic_aa: float

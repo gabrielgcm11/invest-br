@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import offers, rates, simulate
+from app.routers import compare, offers, rates, simulate
 
 app = FastAPI(
     title="invest-br API",
@@ -19,6 +19,7 @@ app.add_middleware(
 app.include_router(rates.router)
 app.include_router(simulate.router)
 app.include_router(offers.router)
+app.include_router(compare.router)
 
 
 @app.get("/health")

@@ -10,6 +10,7 @@ BASE_URL = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.{codigo}/dados/ultimos
 SGS_CDI_ANUAL = 4389   # Taxa DI anualizada base 252 (% a.a.)
 SGS_SELIC_META = 432   # Meta Selic definida pelo Copom (% a.a.)
 SGS_IPCA_MENSAL = 433  # IPCA variação mensal (%)
+SGS_TR_MENSAL = 226    # Taxa Referencial (TR) mensal (%)
 
 _CACHE_TTL_SECONDS = 3600
 _cache: dict[str, tuple[float, object]] = {}
@@ -55,6 +56,11 @@ async def get_ipca_12m() -> float:
     for item in data:
         acumulado *= 1 + float(item["valor"]) / 100
     return round((acumulado - 1) * 100, 2)
+
+
+async def get_tr_mensal() -> float:
+    data = await _fetch_serie(SGS_TR_MENSAL)
+    return float(data[-1]["valor"])
 
 
 async def get_taxas() -> dict:

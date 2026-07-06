@@ -1,6 +1,6 @@
 "use client";
 
-import { Oferta, Taxas, fmtPct } from "@/lib/api";
+import { Oferta, Taxas, diasAteVencimento, fmtPct } from "@/lib/api";
 
 const CORES_TIPO: Record<string, string> = {
   CDB: "bg-selva",
@@ -95,6 +95,14 @@ export default function ReguaCdi({
                         FGC
                       </span>
                     )}
+                    {(() => {
+                      const dias = diasAteVencimento(o.vencimento);
+                      return dias !== null && dias <= 45 ? (
+                        <span className="ml-1 rounded bg-urucum-claro px-1 py-px text-[10px] font-semibold text-urucum">
+                          ⚡ resgate rápido
+                        </span>
+                      ) : null;
+                    })()}
                   </p>
                 </div>
 

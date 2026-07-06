@@ -5,9 +5,13 @@ import Ticker from "@/components/Ticker";
 import PainelBusca, { Filtros } from "@/components/PainelBusca";
 import ReguaCdi from "@/components/ReguaCdi";
 import Simulador from "@/components/Simulador";
+import Comparador from "@/components/Comparador";
 import { Oferta, Taxas, getOfertas, getTaxas } from "@/lib/api";
 
+type Aba = "buscar" | "comparar";
+
 export default function Home() {
+  const [aba, setAba] = useState<Aba>("buscar");
   const [taxas, setTaxas] = useState<Taxas | null>(null);
   const [filtros, setFiltros] = useState<Filtros>({
     valor: 1000,
@@ -48,25 +52,60 @@ export default function Home() {
   return (
     <main className="flex min-h-screen flex-col">
       <Ticker taxas={taxas} />
-      <PainelBusca filtros={filtros} onChange={setFiltros} />
 
-      {erro ? (
-        <section className="mx-auto w-full max-w-6xl px-4 pb-16 sm:px-6">
-          <div className="rounded-2xl border border-dashed border-urucum/50 bg-urucum-claro p-10 text-center">
-            <p className="display text-lg">{erro}</p>
-            <p className="mt-2 text-sm text-musgo">
-              Suba o backend com <code className="num">uvicorn app.main:app --port 8000</code> e
-              recarregue a página.
-            </p>
-          </div>
-        </section>
-      ) : (
-        <ReguaCdi
-          ofertas={ofertas}
-          taxas={taxas}
-          carregando={carregando}
-          onSelecionar={setSelecionada}
-        />
+      <nav
+        className="mx-auto mt-6 flex w-full max-w-6xl gap-1 px-4 sm:px-6"
+        aria-label="Seções"
+      >
+        {(
+          [
+            { id: "buscar", rotulo: "Buscar ofertas" },
+            { id: "comparar", rotulo: "Comparar produtos" },
+          ] as { id: Aba; rotulo: string }[]
+        ).map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setAba(t.id)}
+            aria-current={aba === t.id ? "page" : undefined}
+            className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+              aba === t.id ? "bg-tinta text-papel" : "text-musgo hover:text-tinta"
+            }`}
+          >
+            {t.rotulo}
+          </button>
+        ))}
+      </nav>
+
+      {aba === "buscar" && (
+        <>
+          <PainelBusca filtros={filtros} onChange={setFiltros} />
+
+          {erro ? (
+            <section className="mx-auto w-full max-w-6xl px-4 pb-16 sm:px-6">
+              <div className="rounded-2xl border border-dashed border-urucum/50 bg-urucum-claro p-10 text-center">
+                <p className="display text-lg">{erro}</p>
+                <p className="mt-2 text-sm text-musgo">
+                  Suba o backend com <code className="num">uvicorn app.main:app --port 8000</code>{" "}
+                  e recarregue a página.
+                </p>
+              </div>
+            </section>
+          ) : (
+            <ReguaCdi
+              ofertas={ofertas}
+              taxas={taxas}
+              carregando={carregando}
+              onSelecionar={setSelecionada}
+            />
+          )}
+        </>
+      )}
+
+      {aba === "comparar" && (
+        <div className="pt-8">
+          <Comparador valorInicial={filtros.valor || 1000} />
+        </div>
       )}
 
       <Simulador

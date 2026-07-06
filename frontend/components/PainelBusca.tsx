@@ -64,6 +64,18 @@ export default function PainelBusca({
               onChange={(e) => onChange({ ...filtros, prazoMeses: Number(e.target.value) })}
               aria-label="Prazo em meses"
             />
+            <button
+              type="button"
+              onClick={() => onChange({ ...filtros, prazoMeses: 1 })}
+              aria-pressed={filtros.prazoMeses === 1}
+              className={`self-start rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                filtros.prazoMeses === 1
+                  ? "border-selva bg-selva-claro text-selva"
+                  : "border-linha hover:border-musgo"
+              }`}
+            >
+              ⚡ Resgate rápido (até 1 mês)
+            </button>
           </div>
         </label>
 

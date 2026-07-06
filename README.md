@@ -22,5 +22,22 @@ invest-br/
 ## Stack
 
 - **Backend:** Python 3.11+, FastAPI, httpx, BeautifulSoup
-- **Frontend:** Next.js 14, TypeScript, Tailwind CSS
+- **Frontend:** Next.js 16, TypeScript, Tailwind CSS v4
 - **Dados:** BCB API (oficial), Yubb (scraping)
+
+## Rodar localmente
+
+```bash
+# Backend (porta 8000)
+cd backend
+python -m venv .venv
+.venv/Scripts/pip install -r requirements.txt
+.venv/Scripts/uvicorn app.main:app --port 8000
+
+# Frontend (porta 3000)
+cd frontend
+npm install
+npm run dev
+```
+
+Abra http://localhost:3000.

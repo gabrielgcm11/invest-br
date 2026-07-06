@@ -1,0 +1,90 @@
+@import "tailwindcss";
+
+@theme {
+  --color-papel: #f6f7f4;
+  --color-cartao: #fdfefc;
+  --color-tinta: #101e17;
+  --color-musgo: #5b6b60;
+  --color-selva: #0c6b4a;
+  --color-selva-claro: #eaf3ee;
+  --color-urucum: #ed5c2a;
+  --color-urucum-claro: #fdeee7;
+  --color-linha: #dce0d8;
+
+  --font-sans: var(--font-archivo), system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+}
+
+body {
+  background: var(--color-papel);
+  color: var(--color-tinta);
+}
+
+/* Números sempre tabulares */
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Título expandido — eixo de largura do Archivo variável */
+.display {
+  font-stretch: 125%;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--color-musgo);
+}
+
+/* Barras da régua do CDI */
+.barra {
+  transition: width 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .barra {
+    transition: none;
+  }
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-urucum);
+  outline-offset: 2px;
+}
+
+/* Slider de prazo */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--color-linha);
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--color-tinta);
+  border: 3px solid var(--color-papel);
+  box-shadow: 0 0 0 1.5px var(--color-tinta);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-tinta);
+  border: 3px solid var(--color-papel);
+  box-shadow: 0 0 0 1.5px var(--color-tinta);
+}

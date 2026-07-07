@@ -1,15 +1,18 @@
 @import "tailwindcss";
 
 @theme {
-  --color-papel: #f6f7f4;
-  --color-cartao: #fdfefc;
-  --color-tinta: #101e17;
-  --color-musgo: #5b6b60;
-  --color-selva: #0c6b4a;
-  --color-selva-claro: #eaf3ee;
-  --color-urucum: #ed5c2a;
+  /* Identidade "quantorende": base quase-branca, tinta quase-preta,
+     UM acento verde vivo (abacate). Laranja é funcional: só erro/alerta. */
+  --color-papel: #fafbf8;
+  --color-cartao: #ffffff;
+  --color-tinta: #10160f;
+  --color-musgo: #626d63;
+  --color-selva: #0e8a50;
+  --color-selva-escuro: #0a6b3e;
+  --color-selva-claro: #e4f7ec;
+  --color-urucum: #d94f1e;
   --color-urucum-claro: #fdeee7;
-  --color-linha: #dce0d8;
+  --color-linha: #e6e9e3;
 
   --font-sans: var(--font-archivo), system-ui, sans-serif;
   --font-mono: var(--font-plex-mono), ui-monospace, monospace;
@@ -57,7 +60,7 @@ body {
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-urucum);
+  outline: 2px solid var(--color-selva);
   outline-offset: 2px;
 }
 

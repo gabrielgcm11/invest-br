@@ -1,12 +1,18 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { Comparacao, CORES_SERIES, COR_POUPANCA, Serie } from "@/lib/comparar";
+import {
+  Comparacao,
+  CORES_SERIES,
+  COR_POUPANCA,
+  COR_INVESTIDO,
+  Serie,
+} from "@/lib/comparar";
 import { fmtBRL } from "@/lib/api";
 
 const LARGURA = 860;
-const ALTURA = 340;
-const M = { topo: 28, dir: 150, baixo: 34, esq: 64 };
+const ALTURA = 360;
+const M = { topo: 30, dir: 150, baixo: 36, esq: 58 };
 
 // Degraus do IR regressivo em dias → posição no eixo de meses
 const DEGRAUS_IR = [
@@ -21,19 +27,38 @@ function corDaSerie(s: Serie, idx: number, series: Serie[]): string {
   return CORES_SERIES[produtos.indexOf(s) % CORES_SERIES.length];
 }
 
+/** Valor compacto para eixos: 1.500 → "1,5 mil"; 2.000.000 → "2 mi".
+ *  `faixa` = amplitude do eixo; em faixas curtas mantém precisão para não repetir rótulos. */
+function fmtCompacto(v: number, faixa = Infinity): string {
+  if (Math.abs(v) >= 1_000_000)
+    return `${(v / 1_000_000).toLocaleString("pt-BR", { maximumFractionDigits: faixa < 4_000_000 ? 2 : 1 })} mi`;
+  if (Math.abs(v) >= 1_000 && faixa >= 4_000)
+    return `${(v / 1_000).toLocaleString("pt-BR", { maximumFractionDigits: faixa < 40_000 ? 1 : 0 })} mil`;
+  return v.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
+}
+
+function fmtMes(m: number, horizonte: number): string {
+  if (horizonte > 36) {
+    const anos = m / 12;
+    return `${anos.toLocaleString("pt-BR", { maximumFractionDigits: anos < 1 ? 1 : 0 })}a`;
+  }
+  return `${m}m`;
+}
+
 export default function GraficoComparacao({ dados }: { dados: Comparacao }) {
   const [hoverMes, setHoverMes] = useState<number | null>(null);
   const [verTabela, setVerTabela] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
 
   const { series, meses_max } = dados;
+  const temAporte = dados.aporte_mensal > 0;
 
   const escalas = useMemo(() => {
     const valores = series.flatMap((s) => s.pontos.map((p) => p.valor));
     const min = Math.min(dados.valor_inicial, ...valores);
     const max = Math.max(...valores);
     const folga = (max - min) * 0.06 || 1;
-    const y0 = min - folga;
+    const y0 = min >= 0 ? Math.max(0, min - folga) : min - folga;
     const y1 = max + folga;
     const x = (mes: number) =>
       M.esq + ((mes - 1) / Math.max(meses_max - 1, 1)) * (LARGURA - M.esq - M.dir);
@@ -52,6 +77,17 @@ export default function GraficoComparacao({ dados }: { dados: Comparacao }) {
     [series, escalas],
   );
 
+  // Linha de referência: total que saiu do bolso (mesma p/ todas as séries)
+  const linhaInvestido = useMemo(() => {
+    if (!temAporte) return null;
+    return series[0].pontos
+      .map(
+        (p, i) =>
+          `${i === 0 ? "M" : "L"}${escalas.x(p.mes).toFixed(1)},${escalas.y(p.investido).toFixed(1)}`,
+      )
+      .join("");
+  }, [series, escalas, temAporte]);
+
   const gridY = useMemo(() => {
     const passos = 4;
     return Array.from({ length: passos + 1 }, (_, i) => {
@@ -59,6 +95,18 @@ export default function GraficoComparacao({ dados }: { dados: Comparacao }) {
       return { v, py: escalas.y(v) };
     });
   }, [escalas]);
+
+  const ticksX = useMemo(() => {
+    if (meses_max > 36) {
+      // Horizonte longo: ticks em anos cheios
+      const alvos = [0.25, 0.5, 0.75, 1].map((f) =>
+        Math.min(meses_max, Math.max(12, Math.round((f * meses_max) / 12) * 12)),
+      );
+      return [...new Set(alvos)];
+    }
+    const alvos = [0, 0.25, 0.5, 0.75, 1].map((f) => Math.max(1, Math.round(1 + f * (meses_max - 1))));
+    return [...new Set(alvos)];
+  }, [meses_max]);
 
   const aoMover = (e: React.MouseEvent<SVGSVGElement>) => {
     const svg = svgRef.current;
@@ -70,14 +118,18 @@ export default function GraficoComparacao({ dados }: { dados: Comparacao }) {
     setHoverMes(mes >= 1 && mes <= meses_max ? mes : null);
   };
 
-  const degrausVisiveis = DEGRAUS_IR.filter((d) => d.dias < meses_max * 30.44);
+  // Degraus de IR só quando são legíveis (em horizontes longos viram ruído à esquerda)
+  const degrausVisiveis =
+    meses_max <= 60 ? DEGRAUS_IR.filter((d) => d.dias < meses_max * 30.44) : [];
+
+  const passoTabela = meses_max > 120 ? 12 : meses_max > 48 ? 6 : 3;
 
   return (
     <figure className="m-0">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <figcaption className="eyebrow">
           Valor líquido de {fmtBRL(dados.valor_inicial)}
-          {dados.aporte_mensal > 0 && <> + {fmtBRL(dados.aporte_mensal)}/mês</>} mês a mês
+          {temAporte && <> + {fmtBRL(dados.aporte_mensal)}/mês</>} mês a mês
         </figcaption>
         <button
           type="button"
@@ -102,14 +154,24 @@ export default function GraficoComparacao({ dados }: { dados: Comparacao }) {
             )}
           </li>
         ))}
+        {temAporte && (
+          <li className="flex items-center gap-1.5 text-xs text-musgo">
+            <span
+              className="inline-block h-0 w-4 border-t-2 border-dotted"
+              style={{ borderColor: COR_INVESTIDO }}
+            />
+            só o que você depositou
+          </li>
+        )}
       </ul>
 
       {verTabela ? (
-        <div className="mt-4 overflow-x-auto rounded-xl border border-linha">
+        <div className="mt-4 max-h-96 overflow-auto rounded-xl border border-linha">
           <table className="w-full text-sm">
-            <thead>
+            <thead className="sticky top-0">
               <tr className="border-b border-linha bg-cartao text-left">
-                <th className="px-3 py-2 font-medium">Mês</th>
+                <th className="px-3 py-2 font-medium">{meses_max > 36 ? "Tempo" : "Mês"}</th>
+                {temAporte && <th className="px-3 py-2 font-medium text-musgo">Investido</th>}
                 {series.map((s) => (
                   <th key={s.rotulo} className="px-3 py-2 font-medium">
                     {s.rotulo}
@@ -119,10 +181,13 @@ export default function GraficoComparacao({ dados }: { dados: Comparacao }) {
             </thead>
             <tbody>
               {series[0].pontos
-                .filter((p) => p.mes % 3 === 0 || p.mes === 1)
+                .filter((p) => p.mes % passoTabela === 0 || p.mes === 1)
                 .map((p) => (
                   <tr key={p.mes} className="border-b border-linha/60 last:border-0">
-                    <td className="num px-3 py-1.5">{p.mes}</td>
+                    <td className="num px-3 py-1.5">{fmtMes(p.mes, meses_max)}</td>
+                    {temAporte && (
+                      <td className="num px-3 py-1.5 text-musgo">{fmtBRL(p.investido)}</td>
+                    )}
                     {series.map((s) => (
                       <td key={s.rotulo} className="num px-3 py-1.5">
                         {fmtBRL(s.pontos[p.mes - 1].valor)}
@@ -145,9 +210,9 @@ export default function GraficoComparacao({ dados }: { dados: Comparacao }) {
         >
           {gridY.map((g) => (
             <g key={g.py}>
-              <line x1={M.esq} x2={LARGURA - M.dir} y1={g.py} y2={g.py} stroke="#dce0d8" strokeWidth="1" />
-              <text x={M.esq - 8} y={g.py + 3.5} textAnchor="end" fontSize="11" fill="#5b6b60" className="num">
-                {g.v.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}
+              <line x1={M.esq} x2={LARGURA - M.dir} y1={g.py} y2={g.py} stroke="#e6e9e3" strokeWidth="1" />
+              <text x={M.esq - 8} y={g.py + 3.5} textAnchor="end" fontSize="11" fill="#626d63" className="num">
+                {fmtCompacto(g.v, escalas.y1 - escalas.y0)}
               </text>
             </g>
           ))}
@@ -158,18 +223,29 @@ export default function GraficoComparacao({ dados }: { dados: Comparacao }) {
             return (
               <g key={d.dias}>
                 <line x1={px} x2={px} y1={M.topo - 4} y2={ALTURA - M.baixo} stroke="#9aa69d" strokeWidth="1" strokeDasharray="3 4" />
-                <text x={px} y={M.topo - 10} textAnchor="middle" fontSize="10" fill="#5b6b60" className="num">
+                <text x={px} y={M.topo - 10} textAnchor="middle" fontSize="10" fill="#626d63" className="num">
                   {d.rotulo}
                 </text>
               </g>
             );
           })}
 
-          {[1, Math.round(meses_max / 2), meses_max].map((m) => (
-            <text key={m} x={escalas.x(m)} y={ALTURA - M.baixo + 18} textAnchor="middle" fontSize="11" fill="#5b6b60" className="num">
-              {m}m
+          {ticksX.map((m) => (
+            <text key={m} x={escalas.x(m)} y={ALTURA - M.baixo + 18} textAnchor="middle" fontSize="11" fill="#626d63" className="num">
+              {fmtMes(m, meses_max)}
             </text>
           ))}
+
+          {linhaInvestido && (
+            <path
+              d={linhaInvestido}
+              fill="none"
+              stroke={COR_INVESTIDO}
+              strokeWidth="1.5"
+              strokeDasharray="2 4"
+              strokeLinecap="round"
+            />
+          )}
 
           {linhas.map(({ serie, d }, i) => (
             <path
@@ -177,7 +253,7 @@ export default function GraficoComparacao({ dados }: { dados: Comparacao }) {
               d={d}
               fill="none"
               stroke={corDaSerie(serie, i, series)}
-              strokeWidth="2"
+              strokeWidth="2.25"
               strokeDasharray={serie.tipo === "POUPANCA" ? "5 4" : undefined}
               strokeLinejoin="round"
             />
@@ -188,8 +264,8 @@ export default function GraficoComparacao({ dados }: { dados: Comparacao }) {
             const py = escalas.y(ultimo.valor);
             return (
               <g key={`fim-${serie.rotulo}`}>
-                <circle cx={escalas.x(ultimo.mes)} cy={py} r="3.5" fill={corDaSerie(serie, i, series)} stroke="#f6f7f4" strokeWidth="1.5" />
-                <text x={escalas.x(ultimo.mes) + 8} y={py + 3.5} fontSize="11" fontWeight="600" fill="#101e17" className="num">
+                <circle cx={escalas.x(ultimo.mes)} cy={py} r="3.5" fill={corDaSerie(serie, i, series)} stroke="#fafbf8" strokeWidth="1.5" />
+                <text x={escalas.x(ultimo.mes) + 8} y={py + 3.5} fontSize="11" fontWeight="600" fill="#10160f" className="num">
                   {fmtBRL(ultimo.valor)}
                 </text>
               </g>
@@ -198,32 +274,51 @@ export default function GraficoComparacao({ dados }: { dados: Comparacao }) {
 
           {hoverMes !== null && (
             <g pointerEvents="none">
-              <line x1={escalas.x(hoverMes)} x2={escalas.x(hoverMes)} y1={M.topo} y2={ALTURA - M.baixo} stroke="#101e17" strokeWidth="1" opacity="0.5" />
+              <line x1={escalas.x(hoverMes)} x2={escalas.x(hoverMes)} y1={M.topo} y2={ALTURA - M.baixo} stroke="#10160f" strokeWidth="1" opacity="0.5" />
               {series.map((s, i) => {
                 const p = s.pontos[hoverMes - 1];
                 return (
-                  <circle key={s.rotulo} cx={escalas.x(hoverMes)} cy={escalas.y(p.valor)} r="4" fill={corDaSerie(s, i, series)} stroke="#f6f7f4" strokeWidth="1.5" />
+                  <circle key={s.rotulo} cx={escalas.x(hoverMes)} cy={escalas.y(p.valor)} r="4" fill={corDaSerie(s, i, series)} stroke="#fafbf8" strokeWidth="1.5" />
                 );
               })}
               {(() => {
                 const px = escalas.x(hoverMes);
-                const flip = px > LARGURA - M.dir - 180;
-                const tx = flip ? px - 178 : px + 10;
-                const alturaTip = 22 + series.length * 17;
+                const larguraTip = 196;
+                const flip = px > LARGURA - M.dir - larguraTip - 20;
+                const tx = flip ? px - larguraTip - 10 : px + 10;
+                const linhasTip = series.length + (temAporte ? 1 : 0);
+                const alturaTip = 24 + linhasTip * 17;
+                const pInv = series[0].pontos[hoverMes - 1];
                 return (
                   <g transform={`translate(${tx}, ${M.topo + 6})`}>
-                    <rect width="168" height={alturaTip} rx="8" fill="#fdfefc" stroke="#dce0d8" />
-                    <text x="10" y="16" fontSize="10.5" fontWeight="600" fill="#5b6b60" className="num">
-                      mês {hoverMes} · {series[0].pontos[hoverMes - 1].dias} dias
+                    <rect width={larguraTip} height={alturaTip} rx="8" fill="#ffffff" stroke="#e6e9e3" />
+                    <text x="10" y="16" fontSize="10.5" fontWeight="600" fill="#626d63" className="num">
+                      {meses_max > 36
+                        ? `${fmtMes(hoverMes, meses_max)} · mês ${hoverMes}`
+                        : `mês ${hoverMes} · ${pInv.dias} dias`}
                     </text>
-                    {series.map((s, i) => (
-                      <g key={s.rotulo} transform={`translate(10, ${28 + i * 17})`}>
-                        <circle cx="4" cy="-3.5" r="3.5" fill={corDaSerie(s, i, series)} />
-                        <text x="13" y="0" fontSize="11" fill="#101e17" className="num">
-                          {fmtBRL(s.pontos[hoverMes - 1].valor)}
+                    {series.map((s, i) => {
+                      const p = s.pontos[hoverMes - 1];
+                      const rendeu = p.valor - p.investido;
+                      return (
+                        <g key={s.rotulo} transform={`translate(10, ${30 + i * 17})`}>
+                          <circle cx="4" cy="-3.5" r="3.5" fill={corDaSerie(s, i, series)} />
+                          <text x="13" y="0" fontSize="11" fill="#10160f" className="num">
+                            {fmtBRL(p.valor)}
+                            {temAporte && (
+                              <tspan fill="#626d63"> (+{fmtCompacto(rendeu)})</tspan>
+                            )}
+                          </text>
+                        </g>
+                      );
+                    })}
+                    {temAporte && (
+                      <g transform={`translate(10, ${30 + series.length * 17})`}>
+                        <text x="13" y="0" fontSize="10.5" fill="#626d63" className="num">
+                          depositado: {fmtBRL(pInv.investido)}
                         </text>
                       </g>
-                    ))}
+                    )}
                   </g>
                 );
               })()}

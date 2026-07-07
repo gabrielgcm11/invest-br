@@ -63,7 +63,7 @@ class ProdutoComparacao(BaseModel):
 class ComparacaoRequest(BaseModel):
     valor: float = Field(1000.0, gt=0)
     aporte_mensal: float = Field(0.0, ge=0, description="Aporte ao fim de cada mês, em R$")
-    meses_max: int = Field(24, ge=2, le=120)
+    meses_max: int = Field(24, ge=2, le=480)  # até 40 anos (aposentadoria)
     produtos: list[ProdutoComparacao] = Field(..., min_length=1, max_length=5)
     incluir_poupanca: bool = True
 

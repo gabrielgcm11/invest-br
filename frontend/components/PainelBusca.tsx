@@ -70,7 +70,7 @@ export default function PainelBusca({
               aria-pressed={filtros.prazoMeses === 1}
               className={`self-start rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
                 filtros.prazoMeses === 1
-                  ? "border-selva bg-selva-claro text-selva"
+                  ? "border-selva bg-selva-claro text-selva-escuro"
                   : "border-linha hover:border-musgo"
               }`}
             >

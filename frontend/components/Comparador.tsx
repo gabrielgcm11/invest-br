@@ -27,6 +27,11 @@ const PRESETS: { rotulo: string; produtos: ProdutoComparacao[] }[] = [
   },
 ];
 
+function fmtHorizonte(meses: number): string {
+  if (meses >= 24 && meses % 12 === 0) return `${meses / 12} anos`;
+  return `${meses} meses`;
+}
+
 function rotuloAuto(p: Omit<ProdutoComparacao, "rotulo">): string {
   const sufixo =
     p.indexador === "CDI" ? "% CDI" : p.indexador === "PRE" ? "% a.a." : "% + IPCA";
@@ -37,6 +42,7 @@ export default function Comparador({ valorInicial }: { valorInicial: number }) {
   const [valor, setValor] = useState(valorInicial);
   const [aporte, setAporte] = useState(0);
   const [mesesMax, setMesesMax] = useState(24);
+  const [unidade, setUnidade] = useState<"meses" | "anos">("meses");
   const [incluirPoupanca, setIncluirPoupanca] = useState(true);
   const [produtos, setProdutos] = useState<ProdutoComparacao[]>(PRESETS[0].produtos);
   const [dados, setDados] = useState<Comparacao | null>(null);
@@ -203,7 +209,7 @@ export default function Comparador({ valorInicial }: { valorInicial: number }) {
           <label className="flex flex-col gap-1">
             <span className="eyebrow">Aporte mensal (opcional)</span>
             <div className="flex items-baseline gap-1 border-b-2 border-linha pb-1 focus-within:border-tinta">
-              <span className="num text-sm text-musgo">+ R$</span>
+              <span className="num whitespace-nowrap text-sm text-musgo">+&nbsp;R$</span>
               <input
                 type="number"
                 min={0}
@@ -217,16 +223,52 @@ export default function Comparador({ valorInicial }: { valorInicial: number }) {
             </div>
           </label>
 
-          <label className="flex flex-col gap-2">
-            <span className="eyebrow">Horizonte: {mesesMax} meses</span>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-baseline justify-between">
+              <span className="eyebrow">
+                Horizonte:{" "}
+                {unidade === "anos"
+                  ? `${Math.round(mesesMax / 12)} ${Math.round(mesesMax / 12) === 1 ? "ano" : "anos"}`
+                  : `${mesesMax} meses`}
+              </span>
+              <div className="flex gap-1" role="group" aria-label="Unidade do horizonte">
+                {(["meses", "anos"] as const).map((u) => (
+                  <button
+                    key={u}
+                    type="button"
+                    aria-pressed={unidade === u}
+                    onClick={() => {
+                      setUnidade(u);
+                      if (u === "anos") setMesesMax(Math.max(12, Math.round(mesesMax / 12) * 12));
+                      else if (mesesMax > 60) setMesesMax(60);
+                    }}
+                    className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold transition-colors ${
+                      unidade === u ? "bg-tinta text-papel" : "text-musgo hover:text-tinta"
+                    }`}
+                  >
+                    {u}
+                  </button>
+                ))}
+              </div>
+            </div>
             <input
               type="range"
-              min={3}
-              max={60}
-              value={mesesMax}
-              onChange={(e) => setMesesMax(Number(e.target.value))}
+              min={unidade === "anos" ? 1 : 3}
+              max={unidade === "anos" ? 40 : 60}
+              value={unidade === "anos" ? Math.round(mesesMax / 12) : mesesMax}
+              onChange={(e) =>
+                setMesesMax(
+                  unidade === "anos" ? Number(e.target.value) * 12 : Number(e.target.value),
+                )
+              }
+              aria-label={`Horizonte em ${unidade}`}
             />
-          </label>
+            {unidade === "anos" && (
+              <p className="text-[11px] text-musgo">
+                Modo aposentadoria: veja o efeito dos aportes em décadas.
+              </p>
+            )}
+          </div>
 
           <label className="flex items-center gap-2 text-sm">
             <input
@@ -252,9 +294,15 @@ export default function Comparador({ valorInicial }: { valorInicial: number }) {
               <p className="mt-2 text-lg leading-snug">
                 <strong className="display">{veredito.melhor.rotulo}</strong> termina com{" "}
                 <strong className="num text-selva">{fmtBRL(veredito.diferenca)}</strong> a mais
-                que {veredito.segundo.rotulo} em {mesesMax} meses.
+                que {veredito.segundo.rotulo} em {fmtHorizonte(mesesMax)}.
                 {veredito.cruzamento && veredito.cruzamento > 1 && (
-                  <> A liderança vira no mês {veredito.cruzamento} — antes disso, {veredito.segundo.rotulo} paga mais.</>
+                  <>
+                    {" "}A liderança vira{" "}
+                    {mesesMax > 36
+                      ? `no ano ${Math.ceil(veredito.cruzamento / 12)}`
+                      : `no mês ${veredito.cruzamento}`}
+                    . Antes disso, {veredito.segundo.rotulo} paga mais.
+                  </>
                 )}
               </p>
               {dados.aporte_mensal > 0 && (
@@ -291,6 +339,72 @@ export default function Comparador({ valorInicial }: { valorInicial: number }) {
           {!erro && dados && (
             <div className="rounded-2xl border border-linha bg-cartao p-5">
               <GraficoComparacao dados={dados} />
+            </div>
+          )}
+
+          {!erro && dados && (
+            <div className="rounded-2xl border border-linha bg-cartao p-5">
+              <p className="eyebrow">Quanto é seu dinheiro, quanto é rendimento</p>
+              <ul className="mt-4 flex flex-col gap-4">
+                {dados.series.map((s, i) => {
+                  const fim = s.pontos[s.pontos.length - 1];
+                  const rendimento = fim.valor - fim.investido;
+                  const pct = fim.investido > 0 ? (rendimento / fim.investido) * 100 : 0;
+                  const maiorFinal = Math.max(
+                    ...dados.series.map((x) => x.pontos[x.pontos.length - 1].valor),
+                  );
+                  const cor =
+                    s.tipo === "POUPANCA"
+                      ? "#626d63"
+                      : CORES_SERIES[
+                          dados.series.filter((x) => x.tipo !== "POUPANCA").indexOf(s) %
+                            CORES_SERIES.length
+                        ];
+                  return (
+                    <li key={s.rotulo}>
+                      <div className="flex flex-wrap items-baseline justify-between gap-x-4">
+                        <span className="flex items-center gap-1.5 text-sm font-semibold">
+                          <span
+                            className="inline-block h-2.5 w-2.5 rounded-full"
+                            style={{ background: cor }}
+                          />
+                          {s.rotulo}
+                        </span>
+                        <span className="num text-sm">
+                          {fmtBRL(fim.valor)}{" "}
+                          <span className="text-musgo">
+                            = {fmtBRL(fim.investido)} seu +{" "}
+                          </span>
+                          <span className="font-semibold" style={{ color: cor }}>
+                            {fmtBRL(rendimento)}
+                          </span>{" "}
+                          <span className="text-musgo">
+                            ({pct.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%)
+                          </span>
+                        </span>
+                      </div>
+                      <div
+                        className="mt-1.5 flex h-3 overflow-hidden rounded-full bg-papel"
+                        role="img"
+                        aria-label={`${s.rotulo}: ${fmtBRL(fim.investido)} investidos, ${fmtBRL(rendimento)} de rendimento`}
+                      >
+                        <span
+                          className="h-full bg-linha"
+                          style={{ width: `${(fim.investido / maiorFinal) * 100}%` }}
+                        />
+                        <span
+                          className="h-full"
+                          style={{ width: `${(rendimento / maiorFinal) * 100}%`, background: cor }}
+                        />
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+              <p className="mt-4 text-xs text-musgo">
+                Barra cinza: dinheiro que saiu do seu bolso. Barra colorida: o que o
+                investimento rendeu (já líquido de IR e IOF).
+              </p>
             </div>
           )}
 

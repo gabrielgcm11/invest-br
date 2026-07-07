@@ -4,8 +4,8 @@ import { Oferta, Taxas, diasAteVencimento, fmtPct } from "@/lib/api";
 
 const CORES_TIPO: Record<string, string> = {
   CDB: "bg-selva",
-  LCI: "bg-urucum",
-  LCA: "bg-urucum",
+  LCI: "bg-tinta",
+  LCA: "bg-tinta",
 };
 
 export default function ReguaCdi({
@@ -91,14 +91,14 @@ export default function ReguaCdi({
                   <p className="truncate text-xs text-musgo">
                     {o.tipo} · por {o.distribuidor}
                     {o.fgc && (
-                      <span className="ml-1 rounded bg-selva-claro px-1 py-px text-[10px] font-semibold text-selva">
+                      <span className="ml-1 rounded bg-selva-claro px-1 py-px text-[10px] font-semibold text-selva-escuro">
                         FGC
                       </span>
                     )}
                     {(() => {
                       const dias = diasAteVencimento(o.vencimento);
                       return dias !== null && dias <= 45 ? (
-                        <span className="ml-1 rounded bg-urucum-claro px-1 py-px text-[10px] font-semibold text-urucum">
+                        <span className="ml-1 rounded bg-selva-claro px-1 py-px text-[10px] font-semibold text-selva-escuro">
                           ⚡ resgate rápido
                         </span>
                       ) : null;

@@ -9,6 +9,7 @@ import asyncio
 import re
 import time
 import unicodedata
+from datetime import date
 from urllib.parse import urlencode
 
 from bs4 import BeautifulSoup
@@ -165,6 +166,63 @@ async def buscar_ofertas(
 
     _cache[cache_key] = (now, ofertas)
     return ofertas
+
+
+def _dias_ate(vencimento: str | None) -> int | None:
+    """Dias corridos até um vencimento 'dd/mm/aaaa'."""
+    if not vencimento:
+        return None
+    m = re.search(r"(\d{2})/(\d{2})/(\d{4})", vencimento)
+    if not m:
+        return None
+    alvo = date(int(m.group(3)), int(m.group(2)), int(m.group(1)))
+    return (alvo - date.today()).days
+
+
+# Faixas de prazo consultadas no Yubb para cobrir "até N meses"
+_FAIXAS_MESES = [1, 2, 3, 6, 9, 12, 18, 24, 36, 48, 60]
+
+
+async def buscar_ofertas_ate(
+    principal: float = 1000.0,
+    meses_max: int = 12,
+    tipo: str | None = None,
+    paginas: int = 3,
+) -> list[dict]:
+    """Ofertas com vencimento em ATÉ `meses_max` meses.
+
+    O Yubb só busca por prazo exato (months=N), então consultamos várias
+    faixas em paralelo, juntamos e filtramos pelo vencimento real.
+    """
+    faixas = sorted({m for m in _FAIXAS_MESES if m < meses_max} | {meses_max})
+    resultados = await asyncio.gather(
+        *(buscar_ofertas(principal, m, tipo, paginas) for m in faixas),
+        return_exceptions=True,
+    )
+
+    ofertas: list[dict] = []
+    erros = [r for r in resultados if isinstance(r, BaseException)]
+    for r in resultados:
+        if not isinstance(r, BaseException):
+            ofertas.extend(r)
+    if not ofertas and erros:
+        raise erros[0] if isinstance(erros[0], YubbError) else YubbError(str(erros[0]))
+
+    # Dedup entre faixas + filtro pelo vencimento real (tolerância de 20 dias)
+    limite_dias = round(meses_max * 30.44) + 20
+    vistos: set[str] = set()
+    unicos = []
+    for o in ofertas:
+        chave = o.get("url") or f"{o['nome']}|{o.get('distribuidor')}|{o.get('vencimento')}"
+        if chave in vistos:
+            continue
+        vistos.add(chave)
+        dias = _dias_ate(o.get("vencimento"))
+        if dias is not None and dias > limite_dias:
+            continue
+        o["dias_ate_vencimento"] = dias
+        unicos.append(o)
+    return unicos
 
 
 def filtrar_por_emissor(ofertas: list[dict], emissor: str) -> list[dict]:

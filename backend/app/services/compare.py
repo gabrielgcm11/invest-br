@@ -14,21 +14,47 @@ DIAS_POR_MES = 30.44
 FAIXAS_IR = [(180, 22.5), (360, 20.0), (720, 17.5), (None, 15.0)]
 
 
+def _valor_final(
+    p: ProdutoComparacao, montante: float, dias: int, cdi_aa: float, ipca_12m: float
+):
+    req = SimulacaoRequest(
+        valor=montante, prazo_dias=dias, tipo=p.tipo, indexador=p.indexador, taxa=p.taxa
+    )
+    return calculator.simular(req, cdi_aa=cdi_aa, ipca_12m=ipca_12m)
+
+
 def _serie_produto(
-    p: ProdutoComparacao, valor: float, meses_max: int, cdi_aa: float, ipca_12m: float
+    p: ProdutoComparacao,
+    valor: float,
+    meses_max: int,
+    cdi_aa: float,
+    ipca_12m: float,
+    aporte: float = 0.0,
 ) -> dict:
+    # Cada aporte tem seu próprio relógio de IR/IOF: um aporte feito no mês k,
+    # avaliado no mês m, rendeu (m - k) meses. Pré-computa o valor líquido de
+    # um aporte mantido por d meses e acumula via soma de prefixos.
+    aportes_acum = [0.0] * (meses_max + 1)  # aportes_acum[m] = Σ aportes avaliados no mês m
+    if aporte > 0:
+        liquido_por_meses = [aporte]  # d = 0: aporte recém-feito, sem rendimento
+        for d in range(1, meses_max):
+            r = _valor_final(p, aporte, round(d * DIAS_POR_MES), cdi_aa, ipca_12m)
+            liquido_por_meses.append(r.valor_final)
+        soma = 0.0
+        for m in range(1, meses_max + 1):
+            soma += liquido_por_meses[m - 1]
+            aportes_acum[m] = soma
+
     pontos = []
     for mes in range(1, meses_max + 1):
         dias = round(mes * DIAS_POR_MES)
-        req = SimulacaoRequest(
-            valor=valor, prazo_dias=dias, tipo=p.tipo, indexador=p.indexador, taxa=p.taxa
-        )
-        r = calculator.simular(req, cdi_aa=cdi_aa, ipca_12m=ipca_12m)
+        r = _valor_final(p, valor, dias, cdi_aa, ipca_12m)
         pontos.append(
             {
                 "mes": mes,
                 "dias": dias,
-                "valor": r.valor_final,
+                "valor": round(r.valor_final + aportes_acum[mes], 2),
+                "investido": round(valor + mes * aporte, 2),
                 "aliquota_ir": r.aliquota_ir,
                 "rentabilidade_aa": r.rentabilidade_liquida_aa_pct,
             }
@@ -41,7 +67,9 @@ def _serie_produto(
     }
 
 
-def _serie_poupanca(valor: float, meses_max: int, selic_aa: float, tr_mensal: float) -> dict:
+def _serie_poupanca(
+    valor: float, meses_max: int, selic_aa: float, tr_mensal: float, aporte: float = 0.0
+) -> dict:
     """Poupança: Selic > 8,5% a.a. → 0,5% a.m. + TR; senão 70% da Selic + TR."""
     if selic_aa > 8.5:
         base_mensal = 0.005
@@ -52,13 +80,14 @@ def _serie_poupanca(valor: float, meses_max: int, selic_aa: float, tr_mensal: fl
     pontos = []
     acumulado = valor
     for mes in range(1, meses_max + 1):
-        acumulado *= fator_mensal
+        acumulado = acumulado * fator_mensal + aporte
         rentab_aa = (fator_mensal**12 - 1) * 100
         pontos.append(
             {
                 "mes": mes,
                 "dias": round(mes * DIAS_POR_MES),
                 "valor": round(acumulado, 2),
+                "investido": round(valor + mes * aporte, 2),
                 "aliquota_ir": 0.0,
                 "rentabilidade_aa": round(rentab_aa, 2),
             }
@@ -89,10 +118,13 @@ def comparar(
     selic_aa: float,
     tr_mensal: float,
     incluir_poupanca: bool,
+    aporte_mensal: float = 0.0,
 ) -> dict:
-    series = [_serie_produto(p, valor, meses_max, cdi_aa, ipca_12m) for p in produtos]
+    series = [
+        _serie_produto(p, valor, meses_max, cdi_aa, ipca_12m, aporte_mensal) for p in produtos
+    ]
     if incluir_poupanca:
-        series.append(_serie_poupanca(valor, meses_max, selic_aa, tr_mensal))
+        series.append(_serie_poupanca(valor, meses_max, selic_aa, tr_mensal, aporte_mensal))
 
     equivalencias = [
         {"rotulo": p.rotulo, "faixas": equivalencia_cdb(p.taxa)}
@@ -102,6 +134,7 @@ def comparar(
 
     return {
         "valor_inicial": valor,
+        "aporte_mensal": aporte_mensal,
         "meses_max": meses_max,
         "series": series,
         "equivalencias": equivalencias,

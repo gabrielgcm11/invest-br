@@ -24,4 +24,5 @@ async def comparar(req: ComparacaoRequest):
         selic_aa=selic,
         tr_mensal=tr,
         incluir_poupanca=req.incluir_poupanca,
+        aporte_mensal=req.aporte_mensal,
     )

@@ -66,3 +66,41 @@ def test_equivalencia_cdb():
 def test_equivalencias_so_para_isentos():
     r = _resultado()
     assert [e["rotulo"] for e in r["equivalencias"]] == ["LCA 91% CDI"]
+
+
+def _resultado_aporte(aporte=200.0, meses=24):
+    return comparar(
+        produtos=_produtos(), valor=1000, meses_max=meses,
+        cdi_aa=CDI, ipca_12m=IPCA, selic_aa=SELIC, tr_mensal=TR,
+        incluir_poupanca=True, aporte_mensal=aporte,
+    )
+
+
+def test_aporte_soma_no_investido():
+    r = _resultado_aporte(aporte=200)
+    for s in r["series"]:
+        assert s["pontos"][11]["investido"] == 1000 + 12 * 200
+        assert s["pontos"][-1]["investido"] == 1000 + 24 * 200
+
+
+def test_aporte_valor_supera_investido():
+    # Com juro positivo, valor líquido sempre acima do total aportado
+    r = _resultado_aporte(aporte=200)
+    for s in r["series"]:
+        assert s["pontos"][-1]["valor"] > s["pontos"][-1]["investido"]
+
+
+def test_aporte_maior_que_sem_aporte():
+    com = _resultado_aporte(aporte=200)
+    sem = _resultado()
+    for s_com, s_sem in zip(com["series"], sem["series"]):
+        # Diferença ≥ soma bruta dos aportes (eles também rendem)
+        dif = s_com["pontos"][-1]["valor"] - s_sem["pontos"][-1]["valor"]
+        assert dif >= 24 * 200
+
+
+def test_aporte_zero_igual_sem_aporte():
+    com = _resultado_aporte(aporte=0)
+    sem = _resultado()
+    for s_com, s_sem in zip(com["series"], sem["series"]):
+        assert s_com["pontos"][-1]["valor"] == s_sem["pontos"][-1]["valor"]

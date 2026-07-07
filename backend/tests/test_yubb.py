@@ -1,6 +1,7 @@
+from datetime import date, timedelta
 from pathlib import Path
 
-from app.services.yubb import filtrar_por_emissor, parse_html
+from app.services.yubb import _dias_ate, filtrar_por_emissor, parse_html
 
 FIXTURE = Path(__file__).parent / "fixtures" / "yubb_cdb_sample.html"
 
@@ -33,3 +34,10 @@ def test_filtro_por_emissor_case_insensitive():
 
 def test_filtro_emissor_inexistente_retorna_vazio():
     assert filtrar_por_emissor(_ofertas(), "banco-que-nao-existe") == []
+
+
+def test_dias_ate_vencimento():
+    alvo = date.today() + timedelta(days=90)
+    assert _dias_ate(alvo.strftime("%d/%m/%Y")) == 90
+    assert _dias_ate("sem data") is None
+    assert _dias_ate(None) is None

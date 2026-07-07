@@ -76,7 +76,8 @@ export default function GraficoComparacao({ dados }: { dados: Comparacao }) {
     <figure className="m-0">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <figcaption className="eyebrow">
-          Valor líquido de {fmtBRL(dados.valor_inicial)} mês a mês
+          Valor líquido de {fmtBRL(dados.valor_inicial)}
+          {dados.aporte_mensal > 0 && <> + {fmtBRL(dados.aporte_mensal)}/mês</>} mês a mês
         </figcaption>
         <button
           type="button"

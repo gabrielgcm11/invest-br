@@ -35,6 +35,7 @@ function rotuloAuto(p: Omit<ProdutoComparacao, "rotulo">): string {
 
 export default function Comparador({ valorInicial }: { valorInicial: number }) {
   const [valor, setValor] = useState(valorInicial);
+  const [aporte, setAporte] = useState(0);
   const [mesesMax, setMesesMax] = useState(24);
   const [incluirPoupanca, setIncluirPoupanca] = useState(true);
   const [produtos, setProdutos] = useState<ProdutoComparacao[]>(PRESETS[0].produtos);
@@ -46,14 +47,20 @@ export default function Comparador({ valorInicial }: { valorInicial: number }) {
     if (debounce.current) clearTimeout(debounce.current);
     debounce.current = setTimeout(() => {
       setErro(false);
-      comparar({ valor: valor || 1000, mesesMax, produtos, incluirPoupanca })
+      comparar({
+        valor: valor || 1000,
+        aporteMensal: aporte > 0 ? aporte : 0,
+        mesesMax,
+        produtos,
+        incluirPoupanca,
+      })
         .then(setDados)
         .catch(() => setErro(true));
     }, 500);
     return () => {
       if (debounce.current) clearTimeout(debounce.current);
     };
-  }, [valor, mesesMax, produtos, incluirPoupanca]);
+  }, [valor, aporte, mesesMax, produtos, incluirPoupanca]);
 
   const atualizar = (i: number, mudanca: Partial<ProdutoComparacao>) => {
     setProdutos((atual) =>
@@ -193,6 +200,23 @@ export default function Comparador({ valorInicial }: { valorInicial: number }) {
             </div>
           </label>
 
+          <label className="flex flex-col gap-1">
+            <span className="eyebrow">Aporte mensal (opcional)</span>
+            <div className="flex items-baseline gap-1 border-b-2 border-linha pb-1 focus-within:border-tinta">
+              <span className="num text-sm text-musgo">+ R$</span>
+              <input
+                type="number"
+                min={0}
+                step={50}
+                value={aporte}
+                onChange={(e) => setAporte(Math.max(0, Number(e.target.value)))}
+                className="num w-full bg-transparent text-xl font-semibold outline-none"
+                aria-label="Aporte mensal em reais"
+              />
+              <span className="whitespace-nowrap text-xs text-musgo">/mês</span>
+            </div>
+          </label>
+
           <label className="flex flex-col gap-2">
             <span className="eyebrow">Horizonte: {mesesMax} meses</span>
             <input
@@ -233,6 +257,21 @@ export default function Comparador({ valorInicial }: { valorInicial: number }) {
                   <> A liderança vira no mês {veredito.cruzamento} — antes disso, {veredito.segundo.rotulo} paga mais.</>
                 )}
               </p>
+              {dados.aporte_mensal > 0 && (
+                <p className="mt-2 text-sm text-musgo">
+                  Total investido no período:{" "}
+                  <span className="num">
+                    {fmtBRL(veredito.melhor.pontos[veredito.melhor.pontos.length - 1].investido)}
+                  </span>{" "}
+                  · rendimento líquido do vencedor:{" "}
+                  <span className="num text-selva">
+                    {fmtBRL(
+                      veredito.melhor.pontos[veredito.melhor.pontos.length - 1].valor -
+                        veredito.melhor.pontos[veredito.melhor.pontos.length - 1].investido,
+                    )}
+                  </span>
+                </p>
+              )}
               {dados.equivalencias.length > 0 && (
                 <p className="mt-3 border-t border-linha pt-3 text-sm text-musgo">
                   Para empatar com {dados.equivalencias[0].rotulo}, um CDB precisa pagar{" "}

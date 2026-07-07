@@ -51,7 +51,7 @@ export default function PainelBusca({
         </label>
 
         <label className="flex flex-col gap-2">
-          <span className="eyebrow">Posso deixar por</span>
+          <span className="eyebrow">Resgate em até</span>
           <div className="flex flex-col gap-3 pt-1">
             <span className="num text-2xl font-semibold">
               {filtros.prazoMeses} {filtros.prazoMeses === 1 ? "mês" : "meses"}
